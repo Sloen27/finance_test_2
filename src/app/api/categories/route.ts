@@ -1,97 +1,54 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// GET a single category
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// GET all categories
+export async function GET() {
   try {
-    const { id } = await params
-    const category = await db.category.findUnique({
-      where: { id }
+    const categories = await db.category.findMany({
+      orderBy: [{ type: 'asc' }, { name: 'asc' }]
     })
-
-    if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-    }
-
-    return NextResponse.json(category)
+    return NextResponse.json(categories)
   } catch (error) {
-    console.error('Error fetching category:', error)
-    return NextResponse.json({ error: 'Failed to fetch category' }, { status: 500 })
+    console.error('Error fetching categories:', error)
+    return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
   }
 }
 
-// PUT update a category
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// POST create a new category
+export async function POST(request: Request) {
   try {
-    const { id } = await params
     const body = await request.json()
-    const { name, icon, color, type, expenseType } = body
+    const { name, icon, color, isDefault, type, expenseType } = body
 
-    // Get existing category to preserve isDefault
-    const existingCategory = await db.category.findUnique({ where: { id } })
+    // Validate required fields
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      return NextResponse.json({ error: 'Название категории обязательно' }, { status: 400 })
+    }
 
-    const category = await db.category.update({
-      where: { id },
+    // Create category with proper data
+    const category = await db.category.create({
       data: {
-        name,
+        name: name.trim(),
         icon: icon || null,
         color: color || null,
-        type: type || existingCategory?.type || 'expense',
-        expenseType: expenseType || 'variable',
-        isDefault: existingCategory?.isDefault ?? false
+        isDefault: isDefault === true,
+        type: type || 'expense',
+        expenseType: expenseType || 'variable'
       }
     })
 
     return NextResponse.json(category)
-  } catch (error) {
-    console.error('Error updating category:', error)
-    return NextResponse.json({ error: 'Failed to update category' }, { status: 500 })
-  }
-}
-
-// DELETE a category
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-
-    // Check if category has transactions
-    const transactions = await db.transaction.findFirst({
-      where: { categoryId: id }
-    })
-
-    if (transactions) {
-      return NextResponse.json({ 
-        error: 'Cannot delete category with transactions. Please reassign transactions first.' 
-      }, { status: 400 })
+  } catch (error: unknown) {
+    console.error('Error creating category:', error)
+    
+    // Check for unique constraint violation or other specific errors
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json({ error: 'Категория с таким названием уже существует' }, { status: 400 })
+      }
+      return NextResponse.json({ error: `Ошибка базы данных: ${error.message}` }, { status: 500 })
     }
-
-    // Check if category has budgets
-    const budgets = await db.budget.findFirst({
-      where: { categoryId: id }
-    })
-
-    if (budgets) {
-      return NextResponse.json({ 
-        error: 'Cannot delete category with budgets. Please delete budgets first.' 
-      }, { status: 400 })
-    }
-
-    await db.category.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting category:', error)
-    return NextResponse.json({ error: 'Failed to delete category' }, { status: 500 })
+    
+    return NextResponse.json({ error: 'Неизвестная ошибка при создании категории' }, { status: 500 })
   }
 }
