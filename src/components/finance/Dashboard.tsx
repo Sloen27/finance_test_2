@@ -4,10 +4,11 @@ import { useFinanceStore } from '@/store/finance'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { TrendingUp, TrendingDown, Wallet, Calendar, ArrowUpRight, ArrowDownRight, PiggyBank, Target, Shield, AlertTriangle, ShoppingCart, Sparkles, BarChart3, Coins } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Calendar, ArrowUpRight, ArrowDownRight, PiggyBank, Target, Shield, AlertTriangle, ShoppingCart, Sparkles, BarChart3, Coins, Info } from 'lucide-react'
 import { format, isAfter, isBefore, startOfMonth, endOfMonth, differenceInDays, subMonths } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 
 export function Dashboard() {
   const { transactions, budgets, regularPayments, currentMonth, categories, settings, accounts, goals } = useFinanceStore()
@@ -103,6 +104,14 @@ export function Dashboard() {
 
   const avgMandatoryExpenses = mandatoryExpenses || 1
   const financialCushionMonths = (totalSavings + mainBalance) / avgMandatoryExpenses
+
+  // Calculate upcoming regular payments amount until end of month
+  const upcomingPaymentsTotal = activePayments
+    .filter(p => p.period === 'monthly' && p.dueDate && p.dueDate >= today.getDate())
+    .reduce((sum, p) => sum + (p.amount || 0), 0)
+
+  // Month end forecast with regular payments
+  const monthEndForecast = totalBalance - upcomingPaymentsTotal + totalIncome - totalExpense
 
   // Cash flow for last 6 months
   const cashFlowData = Array.from({ length: 6 }, (_, i) => {
@@ -204,14 +213,81 @@ export function Dashboard() {
 
       {/* Financial Accounts Summary */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Всего средств</CardTitle>
-            <Coins className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold">{formatMoney(totalBalance)}</div>
-          </CardContent>
+        <Card className="cursor-pointer">
+          <HoverCard>
+            <HoverCardTrigger asChild>
+              <div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-1">
+                    Всего средств
+                    <Info className="h-3 w-3 text-muted-foreground" />
+                  </CardTitle>
+                  <Coins className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">{formatMoney(totalBalance)}</div>
+                </CardContent>
+              </div>
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  <h4 className="font-semibold">Финансовая подушка</h4>
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Total Balance */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Общий баланс</span>
+                    <span className="font-semibold">{formatMoney(totalBalance)}</span>
+                  </div>
+                  
+                  {/* Financial Cushion */}
+                  <div className="p-2 rounded-lg bg-muted">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Запас на</span>
+                      <span className="font-bold text-lg">{isFinite(financialCushionMonths) ? financialCushionMonths.toFixed(1) : '0'} мес.</span>
+                    </div>
+                    <Progress value={Math.min(financialCushionMonths * 20, 100)} className="mt-2 h-1.5" />
+                  </div>
+
+                  {/* Month End Forecast */}
+                  <div className="border-t pt-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Прогноз на конец месяца</span>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Текущий баланс</span>
+                        <span>{formatMoney(totalBalance)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Доходы за месяц</span>
+                        <span className="text-green-600">+{formatMoney(totalIncome)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Расходы за месяц</span>
+                        <span className="text-red-600">-{formatMoney(totalExpense)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Ожидаемые платежи</span>
+                        <span className="text-red-600">-{formatMoney(upcomingPaymentsTotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t font-semibold">
+                        <span>Итого</span>
+                        <span className={monthEndForecast >= 0 ? 'text-green-600' : 'text-red-600'}>
+                          {formatMoney(monthEndForecast)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
         </Card>
 
         <Card>

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -53,6 +54,10 @@ export function Categories() {
     type: 'expense',
     expenseType: 'variable'
   })
+
+  // Delete confirmation state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string; isDefault: boolean } | null>(null)
 
   const openAddDialog = (type: 'expense' | 'income') => {
     setEditingCategory(null)
@@ -127,25 +132,30 @@ export function Categories() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteClick = (id: string) => {
     const category = categories.find(c => c.id === id)
-    if (category?.isDefault) {
-      alert('Стандартные категории нельзя удалить.')
-      return
+    if (category) {
+      setCategoryToDelete({ id, name: category.name, isDefault: category.isDefault })
+      setIsDeleteDialogOpen(true)
     }
+  }
 
-    if (!confirm('Удалить эту категорию?')) return
+  const handleDeleteConfirm = async () => {
+    if (!categoryToDelete) return
 
     try {
-      const response = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+      const response = await fetch(`/api/categories/${categoryToDelete.id}`, { method: 'DELETE' })
       if (response.ok) {
-        removeCategory(id)
+        removeCategory(categoryToDelete.id)
       } else {
         const data = await response.json()
         alert(data.error || 'Ошибка при удалении')
       }
     } catch (error) {
       console.error('Error deleting category:', error)
+    } finally {
+      setIsDeleteDialogOpen(false)
+      setCategoryToDelete(null)
     }
   }
 
@@ -167,7 +177,7 @@ export function Categories() {
     return EXPENSE_TYPES.find(t => t.value === type)?.color || '#888'
   }
 
-  const renderCategoryCard = (category: typeof categories[0], canDelete: boolean, isIncome: boolean) => (
+  const renderCategoryCard = (category: typeof categories[0], isIncome: boolean) => (
     <div
       key={category.id}
       className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
@@ -181,6 +191,11 @@ export function Categories() {
         {category.icon && (
           <Badge variant="outline" className="text-xs font-normal">
             {category.icon}
+          </Badge>
+        )}
+        {category.isDefault && (
+          <Badge variant="secondary" className="text-xs">
+            Базовая
           </Badge>
         )}
         {!isIncome && (
@@ -214,38 +229,23 @@ export function Categories() {
           </Tooltip>
         </TooltipProvider>
 
-        {canDelete ? (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(category.id)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Удалить</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ) : (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="px-2">
-                  <Info className="h-4 w-4 text-muted-foreground/50" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Стандартную категорию нельзя удалить</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDeleteClick(category.id)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Удалить</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   )
@@ -254,7 +254,6 @@ export function Categories() {
     title: string,
     icon: React.ReactNode,
     categoriesList: typeof safeCategories,
-    canDelete: boolean,
     isIncome: boolean
   ) => (
     <div>
@@ -271,7 +270,7 @@ export function Categories() {
           </div>
         ) : (
           <div className="grid gap-2">
-            {categoriesList.map(category => renderCategoryCard(category, canDelete, isIncome))}
+            {categoriesList.map(category => renderCategoryCard(category, isIncome))}
           </div>
         )}
       </ScrollArea>
@@ -340,14 +339,12 @@ export function Categories() {
                 'Базовые категории',
                 <FolderOpen className="h-4 w-4 text-muted-foreground" />,
                 defaultExpenseCategories,
-                false,
                 false
               )}
               {renderCategorySection(
                 'Пользовательские категории',
                 <FolderPlus className="h-4 w-4 text-muted-foreground" />,
                 customExpenseCategories,
-                true,
                 false
               )}
             </CardContent>
@@ -376,14 +373,12 @@ export function Categories() {
                 'Базовые категории',
                 <FolderOpen className="h-4 w-4 text-muted-foreground" />,
                 defaultIncomeCategories,
-                false,
                 true
               )}
               {renderCategorySection(
                 'Пользовательские категории',
                 <FolderPlus className="h-4 w-4 text-muted-foreground" />,
                 customIncomeCategories,
-                true,
                 true
               )}
             </CardContent>
@@ -519,6 +514,35 @@ export function Categories() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить категорию "{categoryToDelete?.name}"?</AlertDialogTitle>
+            {categoryToDelete?.isDefault ? (
+              <AlertDialogDescription className="space-y-2">
+                <span className="text-amber-600 font-medium">Это базовая категория.</span>
+                <br />
+                Вы уверены, что хотите её удалить? Это действие нельзя отменить.
+              </AlertDialogDescription>
+            ) : (
+              <AlertDialogDescription>
+                Это действие нельзя отменить. Категория будет удалена навсегда.
+              </AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
