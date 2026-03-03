@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
-import { Plus, Pencil, Trash2, Filter, ArrowUpRight, ArrowDownRight, List, Calendar as CalendarIcon, ChevronLeft, ChevronRight, PieChart } from 'lucide-react'
+import { Plus, Pencil, Trash2, Filter, ArrowUpRight, ArrowDownRight, List, Calendar as CalendarIcon, ChevronLeft, ChevronRight, PieChart, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isWeekend } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -44,6 +45,11 @@ export function Transactions() {
   // Calendar state
   const [calendarDate, setCalendarDate] = useState(new Date(currentMonth + '-01'))
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  const [isDayDialogOpen, setIsDayDialogOpen] = useState(false)
+
+  // Sorting state
+  const [sortField, setSortField] = useState<'date' | 'amount'>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   // Filters
   const [filterType, setFilterType] = useState<string>('all')
@@ -58,6 +64,14 @@ export function Transactions() {
     if (filterCategory !== 'all' && t.categoryId !== filterCategory) return false
     if (filterCurrency !== 'all' && t.currency !== filterCurrency) return false
     return true
+  }).sort((a, b) => {
+    let comparison = 0
+    if (sortField === 'date') {
+      comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
+    } else if (sortField === 'amount') {
+      comparison = a.amount - b.amount
+    }
+    return sortDirection === 'asc' ? comparison : -comparison
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,6 +144,19 @@ export function Transactions() {
 
   const getDayTransactions = (date: Date) => {
     return transactions.filter(t => isSameDay(new Date(t.date), date))
+  }
+
+  const handleDayClick = (day: Date) => {
+    setSelectedDay(day)
+    setIsDayDialogOpen(true)
+  }
+
+  const handleAddTransactionFromDay = () => {
+    if (selectedDay) {
+      setFormData({ ...initialFormData, date: format(selectedDay, 'yyyy-MM-dd') })
+      setIsDayDialogOpen(false)
+      setIsDialogOpen(true)
+    }
   }
 
   const getDayTotals = (date: Date) => {
@@ -372,6 +399,35 @@ export function Transactions() {
                     <SelectItem value="USD">$ USD</SelectItem>
                   </SelectContent>
                 </Select>
+
+                {/* Sorting */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      <ArrowUpDown className="h-4 w-4 mr-2" />
+                      Сортировка
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => { setSortField('date'); setSortDirection('desc') }}>
+                      <ArrowDown className="h-4 w-4 mr-2" />
+                      Дата (новые первые)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setSortField('date'); setSortDirection('asc') }}>
+                      <ArrowUp className="h-4 w-4 mr-2" />
+                      Дата (старые первые)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => { setSortField('amount'); setSortDirection('desc') }}>
+                      <ArrowDown className="h-4 w-4 mr-2" />
+                      Сумма (по убыванию)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setSortField('amount'); setSortDirection('asc') }}>
+                      <ArrowUp className="h-4 w-4 mr-2" />
+                      Сумма (по возрастанию)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {/* Transactions List */}
@@ -496,11 +552,7 @@ export function Transactions() {
                         ${weekend && !isToday(day) ? 'bg-red-50 dark:bg-red-950/20' : ''}
                         ${weekend ? 'hover:bg-red-100 dark:hover:bg-red-900/30' : ''}
                       `}
-                      onClick={() => {
-                        setSelectedDay(day)
-                        setFormData({ ...initialFormData, date: format(day, 'yyyy-MM-dd') })
-                        setIsDialogOpen(true)
-                      }}
+                      onClick={() => handleDayClick(day)}
                     >
                       <div className="flex flex-col h-full">
                         <span className={`text-base font-medium ${
@@ -528,6 +580,117 @@ export function Transactions() {
           )}
         </CardContent>
       </Card>
+
+      {/* Day Transactions Dialog */}
+      <Dialog open={isDayDialogOpen} onOpenChange={setIsDayDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDay && format(selectedDay, 'd MMMM yyyy', { locale: ru })}
+            </DialogTitle>
+            <DialogDescription>
+              Транзакции за выбранный день
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedDay && (() => {
+            const dayTransactions = getDayTransactions(selectedDay)
+            const dayTotals = getDayTotals(selectedDay)
+            
+            return (
+              <div className="space-y-4">
+                {/* Day Summary */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Доход</p>
+                    <p className="text-lg font-semibold text-green-600">+{formatMoney(dayTotals.income)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Расход</p>
+                    <p className="text-lg font-semibold text-red-600">-{formatMoney(dayTotals.expense)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Итого</p>
+                    <p className={`text-lg font-semibold ${dayTotals.income - dayTotals.expense >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatMoney(dayTotals.income - dayTotals.expense)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Transactions List */}
+                <ScrollArea className="h-[250px]">
+                  {dayTransactions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Нет транзакций за этот день
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {dayTransactions.map(transaction => (
+                        <div
+                          key={transaction.id}
+                          className="flex items-center justify-between p-3 rounded-lg border"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${
+                              transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'
+                            }`}>
+                              {transaction.type === 'income'
+                                ? <ArrowUpRight className="h-4 w-4 text-green-600" />
+                                : <ArrowDownRight className="h-4 w-4 text-red-600" />
+                              }
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{transaction.category.name}</p>
+                              {transaction.comment && (
+                                <p className="text-xs text-muted-foreground">{transaction.comment}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-semibold ${
+                              transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {transaction.type === 'income' ? '+' : '-'}{formatMoney(transaction.amount, transaction.currency)}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                handleEdit(transaction)
+                                setIsDayDialogOpen(false)
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                handleDelete(transaction.id)
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+
+                <DialogFooter>
+                  <Button onClick={handleAddTransactionFromDay}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Добавить транзакцию
+                  </Button>
+                </DialogFooter>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
