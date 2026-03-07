@@ -44,6 +44,8 @@ export default function Home() {
     accounts,
     goals,
     investments,
+    monthlyIncome,
+    budgetStats,
     currentMonth,
     setCategories,
     setTransactions,
@@ -53,6 +55,8 @@ export default function Home() {
     setAccounts,
     setGoals,
     setInvestments,
+    setMonthlyIncome,
+    setBudgetStats,
     setCurrentMonth,
     isLoading,
     setIsLoading
@@ -83,7 +87,7 @@ export default function Home() {
         }
 
         // Fetch all data in parallel
-        const [categoriesRes, transactionsRes, budgetsRes, regularPaymentsRes, settingsRes, accountsRes, goalsRes, investmentsRes] = await Promise.all([
+        const [categoriesRes, transactionsRes, budgetsRes, regularPaymentsRes, settingsRes, accountsRes, goalsRes, investmentsRes, incomeRes, budgetStatsRes] = await Promise.all([
           fetch('/api/categories'),
           fetch('/api/transactions'),
           fetch('/api/budgets'),
@@ -91,10 +95,12 @@ export default function Home() {
           fetch('/api/settings'),
           fetch('/api/accounts'),
           fetch('/api/goals'),
-          fetch('/api/investments')
+          fetch('/api/investments'),
+          fetch('/api/income'),
+          fetch('/api/budget-stats')
         ])
 
-        const [categoriesData, transactionsData, budgetsData, regularPaymentsData, settingsData, accountsData, goalsData, investmentsData] = await Promise.all([
+        const [categoriesData, transactionsData, budgetsData, regularPaymentsData, settingsData, accountsData, goalsData, investmentsData, incomeData, budgetStatsData] = await Promise.all([
           categoriesRes.json(),
           transactionsRes.json(),
           budgetsRes.json(),
@@ -102,7 +108,9 @@ export default function Home() {
           settingsRes.json(),
           accountsRes.json(),
           goalsRes.json(),
-          investmentsRes.json()
+          investmentsRes.json(),
+          incomeRes.json(),
+          budgetStatsRes.json()
         ])
 
         // Ensure all data is arrays (handle error objects from API)
@@ -114,6 +122,8 @@ export default function Home() {
         setAccounts(Array.isArray(accountsData) ? accountsData : [])
         setGoals(Array.isArray(goalsData) ? goalsData : [])
         setInvestments(Array.isArray(investmentsData) ? investmentsData : [])
+        setMonthlyIncome(incomeData && !incomeData.error ? incomeData : null)
+        setBudgetStats(budgetStatsData && !budgetStatsData.error ? budgetStatsData : null)
 
         // Apply theme
         if (settingsData && settingsData.theme) {

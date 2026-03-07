@@ -85,6 +85,40 @@ export interface Investment {
   date: Date
 }
 
+export interface MonthlyIncome {
+  id: string | null
+  amount: number
+  currency: string
+  month: string
+  source: string | null
+  isRecurring: boolean
+  isFromPrevious?: boolean
+}
+
+export interface CategoryBudgetStat {
+  id: string
+  name: string
+  color: string | null
+  budget: number
+  spent: number
+  overspent: number
+  remaining: number
+}
+
+export interface BudgetStats {
+  id: string
+  month: string
+  plannedIncome: number
+  mandatoryBudgetTotal: number
+  mandatorySpent: number
+  mandatoryOverspent: number
+  otherExpenses: number
+  remainingBudget: number
+  actualRemaining: number
+  categoryStats: CategoryBudgetStat[]
+  avgMandatoryExpenses: number
+}
+
 interface FinanceStore {
   categories: Category[]
   transactions: Transaction[]
@@ -94,6 +128,8 @@ interface FinanceStore {
   accounts: Account[]
   goals: FinancialGoal[]
   investments: Investment[]
+  monthlyIncome: MonthlyIncome | null
+  budgetStats: BudgetStats | null
   currentMonth: string
   isLoading: boolean
 
@@ -133,6 +169,9 @@ interface FinanceStore {
   addInvestment: (investment: Investment) => void
   removeInvestment: (id: string) => void
 
+  setMonthlyIncome: (income: MonthlyIncome) => void
+  setBudgetStats: (stats: BudgetStats) => void
+
   setCurrentMonth: (month: string) => void
   setIsLoading: (loading: boolean) => void
 }
@@ -151,6 +190,8 @@ export const useFinanceStore = create<FinanceStore>((set) => ({
   accounts: [],
   goals: [],
   investments: [],
+  monthlyIncome: null,
+  budgetStats: null,
   currentMonth: getCurrentMonth(),
   isLoading: true,
 
@@ -229,6 +270,9 @@ export const useFinanceStore = create<FinanceStore>((set) => ({
   removeInvestment: (id) => set((state) => ({
     investments: state.investments.filter((i) => i.id !== id)
   })),
+
+  setMonthlyIncome: (monthlyIncome) => set({ monthlyIncome }),
+  setBudgetStats: (budgetStats) => set({ budgetStats }),
 
   setCurrentMonth: (month) => set({ currentMonth: month }),
   setIsLoading: (loading) => set({ isLoading: loading })

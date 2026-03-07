@@ -25,41 +25,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 
-    const now = new Date()
+    // Update balances
+    const updatedFrom = await db.account.update({
+      where: { id: fromAccountId },
+      data: { balance: fromAccount.balance - transferAmount }
+    })
 
-    // Update balances and record history
-    const [updatedFrom, updatedTo] = await db.$transaction([
-      // Update from account
-      db.account.update({
-        where: { id: fromAccountId },
-        data: { balance: fromAccount.balance - transferAmount }
-      }),
-      // Update to account
-      db.account.update({
-        where: { id: toAccountId },
-        data: { balance: toAccount.balance + transferAmount }
-      }),
-      // Record history for from account (outgoing)
-      db.balanceHistory.create({
-        data: {
-          accountId: fromAccountId,
-          balance: fromAccount.balance - transferAmount,
-          change: -transferAmount,
-          reason: 'transfer_out',
-          date: now
-        }
-      }),
-      // Record history for to account (incoming)
-      db.balanceHistory.create({
-        data: {
-          accountId: toAccountId,
-          balance: toAccount.balance + transferAmount,
-          change: transferAmount,
-          reason: 'transfer_in',
-          date: now
-        }
-      })
-    ])
+    const updatedTo = await db.account.update({
+      where: { id: toAccountId },
+      data: { balance: toAccount.balance + transferAmount }
+    })
 
     return NextResponse.json({
       success: true,
